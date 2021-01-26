@@ -9,7 +9,7 @@
         <relativePath/>
     </parent>
     <packaging>pom</packaging>
-    <groupId>com.laoshiren.hello.seata</groupId>
+    <groupId>com.laoshiren.hello.rocket</groupId>
     <artifactId>hello-rocketmq</artifactId>
     <version>0.0.1-SNAPSHOT</version>
 
@@ -41,7 +41,7 @@
     <dependencyManagement>
         <dependencies>
             <dependency>
-                <groupId>com.laoshiren.hello.rocketmq</groupId>
+                <groupId>com.laoshiren.hello.rocket</groupId>
                 <artifactId>dependencies</artifactId>
                 <version>${project.version}</version>
                 <type>pom</type>
