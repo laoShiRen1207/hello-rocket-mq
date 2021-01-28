@@ -1,3 +1,6 @@
+# RocketMQ 4.5.2
+
+
 ## 消息队列
 
 ### 什么是消息队列
@@ -12,13 +15,15 @@
 
 一般分为有`Broker`和没有`Broker`，然而主流的`MQ`都是有`Broker`的，通常有一台服务器作为`Broker`，所有的消息都通过它中转。生产者把消息发送给它就结束自己的任务了，`Broker`则把消息主动推送给消费者（或者消费者主动轮询）。然而此文章就简单的写一下有`Broker`的`RocketMQ`的玩法。
 
-## Apache RocketMQ
 
 
+## 2 Deployment
 
-## 部署RocketMQ
+[安装链接(官网 http://rocketmq.apache.org/docs/rmq-deployment/)](http://rocketmq.apache.org/docs/rmq-deployment/)
 
-~~~yml
+docker-compose
+
+~~~yaml
 version: '3.5'
 services:
   rmqnamesrv:
@@ -76,10 +81,19 @@ networks:
     driver: bridge
 ~~~
 
-broker.conf
+写入配置文件
+
+~~~shell
+mkdir data
+cd data 
+
+mkdir brokerconf
+cd brokerconf
+
+vi broker.conf
+~~~
 
 ~~~conf
-# 所属集群名字
 brokerClusterName=DefaultCluster
 
 # broker 名字，注意此处不同的配置文件填写的不一样，如果在 broker-a.properties 使用: broker-a,
@@ -94,7 +108,7 @@ brokerId=0
 
 # 启动IP,如果 docker 报 com.alibaba.rocketmq.remoting.exception.RemotingConnectException: connect to <192.168.0.120:10909> failed
 # 解决方式1 加上一句 producer.setVipChannelEnabled(false);，解决方式2 brokerIP1 设置宿主机IP，不要使用docker 内部IP
-brokerIP1=xxx.xxx.xxx.xxx
+brokerIP1=120.79.0.210
 
 # 在发送消息时，自动创建服务器不存在的topic，默认创建的队列数
 defaultTopicQueueNums=4
@@ -161,3 +175,204 @@ flushDiskType=ASYNC_FLUSH
 # pullMessageThreadPoolNums=128
 ~~~
 
+启动
+
+~~~shell
+docker-compose up -d
+~~~
+
+访问`ip:8999`
+
+![](https://img-blog.csdnimg.cn/20210128104057646.png)
+
+## 3 Development
+
+### 3.1  java-client
+
+#### 3.1.1 简单同步发送
+
+~~~java
+ @SneakyThrows
+ public static void main(String[] args) {
+     // 实例化生产者
+     DefaultMQProducer producer = new DefaultMQProducer(UUID.randomUUID().toString());
+     /*
+     *   定义服务器地址
+     *   集群模式 producer.setNamesrvAddr("ip:9876;ip:9877");
+     * */
+     producer.setNamesrvAddr("ip:9876");
+     producer.start();
+     /*
+     *   创建消息 指定 topic tag 和message
+     *   tags 对于消息的快速过滤
+     * */
+     Message message = new Message("topic","tag","hello-world - java - sync".getBytes(RemotingHelper.DEFAULT_CHARSET));
+     /*
+     {
+     	"topic": "topic",
+     	"flag": 0,
+     	"properties": {
+     		"WAIT": "true",
+     		"TAGS": "tag"
+     	},
+     	"body": "aGVsbG8td29ybGQgLSBqYXZhIC0gc3luYw==",
+     	"transactionId": null,
+     	"tags": "tag",
+     	"keys": null,
+     	"waitStoreMsgOK": true,
+     	"delayTimeLevel": 0,
+     	"buyerId": null
+     }
+      */
+     // 发送到broker上
+     SendResult send = producer.send(message);
+     /*
+     {
+         "sendStatus": "SEND_OK",
+         "msgId": "C0A8087D156800B4AAC28D6C8FE30000",
+         "messageQueue": {
+             "topic": "topic",
+             "brokerName": "broker-a",
+             "queueId": 0
+         },
+         "queueOffset": 1,
+         "transactionId": null,
+         "offsetMsgId": "784F00D200002A9F00000000000002D8",
+         "regionId": "DefaultRegion",
+         "traceOn": true
+     }
+      */
+     // 关闭 生产者
+     producer.shutdown();
+ }
+~~~
+
+~~~java
+@SneakyThrows
+public static void main(String[] args) {
+    // 创建消息消费者
+    DefaultMQPushConsumer consumer = new DefaultMQPushConsumer(UUID.randomUUID().toString());
+    /*
+     * 定义服务器地址
+     */
+    consumer.setNamesrvAddr("ip:9876");
+    /*
+     * 消费者从最早的可消费的信息开始
+     */
+    consumer.setConsumeFromWhere(ConsumeFromWhere.CONSUME_FROM_FIRST_OFFSET);
+    /*
+     * 订阅topic  subExpression 表示消费哪些tag 的消息
+     */
+    consumer.subscribe("topic", "*");
+    consumer.registerMessageListener((MessageListenerConcurrently) (msgs, context) -> {
+        ObjectMapper objectMapper = new ObjectMapper();
+        try {
+            Map<String,Object> map = new HashMap<>();
+            map.put("msgs",msgs);
+            map.put("context",context);
+            System.err.println(objectMapper.writeValueAsString(map));
+            /*
+                {
+                	"msgs": [{
+                		"topic": "topic",
+                		"flag": 0,
+                		"properties": {
+                			"MIN_OFFSET": "0",
+                			"MAX_OFFSET": "2",
+                			"CONSUME_START_TIME": "1611811231036",
+                			"UNIQ_KEY": "C0A8087D04B400B4AAC2841A30610000",
+                			"WAIT": "true",
+                			"TAGS": "tag"
+                		},
+                		"body": "aGVsbG8td29ybGQgLSBqYXZhIC0gc3luYw==",
+                		"transactionId": null,
+                		"queueId": 1,
+                		"storeSize": 182,
+                		"queueOffset": 0,
+                		"sysFlag": 0,
+                		"bornTimestamp": 1611646708834,
+                		"bornHost": "218.81.8.90:54471",
+                		"storeTimestamp": 1611646708905,
+                		"msgId": "C0A8087D04B400B4AAC2841A30610000",
+                		"commitLogOffset": 364,
+                		"bodyCRC": 317426201,
+                		"reconsumeTimes": 0,
+                		"preparedTransactionOffset": 0,
+                		"offsetMsgId": "784F00D200002A9F000000000000016C",
+                		"bornHostBytes": "2lEIWgAA1Mc=",
+                		"storeHostBytes": "eE8A0gAAKp8=",
+                		"keys": null,
+                		"waitStoreMsgOK": true,
+                		"buyerId": null,
+                		"delayTimeLevel": 0,
+                		"tags": "tag"
+                	}],
+                	"context": {
+                		"messageQueue": {
+                			"topic": "topic",
+                			"brokerName": "broker-a",
+                			"queueId": 1
+                		},
+                		"delayLevelWhenNextConsume": 0,
+                		"ackIndex": 2147483647
+                	}
+                } 
+             */
+        }catch ( JsonProcessingException e) {
+            e.printStackTrace();
+        }
+        return ConsumeConcurrentlyStatus.CONSUME_SUCCESS;
+    });
+    /*
+     *  开启消费者
+     */
+    consumer.start();
+}
+~~~
+
+#### 3.1.2 异步发送
+
+~~~java
+static final CountDownLatch countDownLatch = new CountDownLatch(3);
+
+@SneakyThrows
+public static void main(String[] args) {
+    DefaultMQProducer producer = new DefaultMQProducer(UUID.randomUUID().toString());
+    producer.setNamesrvAddr("ip:9876");
+    producer.start();
+    // 在异步模式下声明发送失败之前在内部执行的最大重试次数
+    producer.setRetryTimesWhenSendAsyncFailed(0);
+    for (int i = 0; i <3 ; i++) {
+        Message message = new Message("topic",
+                "tag-async",
+                (i+"hello-world - java - async").getBytes(RemotingHelper.DEFAULT_CHARSET));
+        /*
+            异步发送消息给代理。
+            此方法立即返回。 发送完成后，将执行sendCallback。
+         */
+        producer.send(message, new SendCallback() {
+            @Override
+            public void onSuccess(SendResult sendResult) {
+                // 发送成功 回调函数
+                try {
+                    System.out.printf("%s %n",new ObjectMapper().writeValueAsString(sendResult));
+                } catch (JsonProcessingException ignore) { }
+                countDownLatch.countDown();
+            }
+            @Override
+            public void onException(Throwable e) {
+                countDownLatch.countDown();
+                e.printStackTrace();
+            }
+        });
+    }
+    countDownLatch.await(3, TimeUnit.SECONDS);
+    producer.shutdown();
+}
+~~~
+
+
+
+
+
+### 3.2 spring-boot
