@@ -13,6 +13,7 @@
         <okhttp3.version>4.1.0</okhttp3.version>
         <bitwalker.version>1.21</bitwalker.version>
         <feign-okhttp.version>10.3.0</feign-okhttp.version>
+        <rocketmq-client.version>4.5.2</rocketmq-client.version>
 
         <!-- Native Cloud -->
         <dubbo.version>2.7.3</dubbo.version>
@@ -146,6 +147,13 @@
             </dependency>
 
             <!-- Commons -->
+
+            <dependency>
+                <groupId>org.apache.rocketmq</groupId>
+                <artifactId>rocketmq-client</artifactId>
+                <version>${rocketmq-client.version}</version>
+            </dependency>
+
             <dependency>
                 <groupId>com.squareup.okhttp3</groupId>
                 <artifactId>okhttp</artifactId>
