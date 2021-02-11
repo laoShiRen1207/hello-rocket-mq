@@ -7,7 +7,7 @@
         <artifactId>provider</artifactId>
         <version>0.0.1-SNAPSHOT</version>
     </parent>
-    <artifactId>rocketmq-java</artifactId>
+    <artifactId>rocket-mq-java</artifactId>
     <packaging>jar</packaging>
 
     <modules>

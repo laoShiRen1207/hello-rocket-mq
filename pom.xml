@@ -10,7 +10,7 @@
     </parent>
     <packaging>pom</packaging>
     <groupId>com.laoshiren.hello.rocket</groupId>
-    <artifactId>hello-rocketmq</artifactId>
+    <artifactId>hello-rocket-mq</artifactId>
     <version>0.0.1-SNAPSHOT</version>
 
     <name>${project.artifactId}</name>
